@@ -15,17 +15,17 @@
         android:id="@+id/dateLayout"
         android:layout_width="match_parent"
         android:layout_height="wrap_content">
-        <EditText
+        <Button
             android:id="@+id/fromDate"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
-            android:hint="from date"/>
+            android:hint="From Date"/>
 
-        <EditText
+        <Button
             android:id="@+id/toDate"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
-            android:hint="to date"/>
+            android:hint="To Date"/>
 
     </LinearLayout>
 
@@ -35,24 +35,34 @@
         android:layout_height="wrap_content">
 
 
-        <EditText
+        <Spinner
             android:id="@+id/fromCurrency"
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:hint="from Currency"/>
+            android:layout_width="70dp"
+            android:layout_height="match_parent"/>
 
-        <EditText
+        <Spinner
             android:id="@+id/toCurrency"
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:hint="to Currency"/>
+            android:layout_width="70dp"
+            android:layout_height="match_parent"/>
 
-
-        <Button
-            android:id="@+id/getRates"
+        <RelativeLayout
             android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:text="get rates"/>
+            android:layout_height="wrap_content">
+
+            <Button
+                android:id="@+id/getRates"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="get rates"/>
+            <ProgressBar
+                android:id="@+id/progressBar"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_alignTop="@+id/getRates"
+                android:layout_centerHorizontal="true"
+                android:visibility="invisible"/>
+
+        </RelativeLayout>
     </LinearLayout>
 
 

@@ -1,14 +1,16 @@
 package com.example.exchange;
 
 import android.app.DatePickerDialog;
-import android.support.v7.app.AppCompatActivity;
 import android.os.Bundle;
-import android.text.InputFilter;
+import android.support.v7.app.AppCompatActivity;
 import android.util.Log;
 import android.view.View;
+import android.widget.AdapterView;
+import android.widget.ArrayAdapter;
 import android.widget.Button;
 import android.widget.DatePicker;
-import android.widget.EditText;
+import android.widget.ProgressBar;
+import android.widget.Spinner;
 import android.widget.Toast;
 
 import com.android.volley.Cache;
@@ -22,6 +24,7 @@ import com.android.volley.toolbox.BasicNetwork;
 import com.android.volley.toolbox.DiskBasedCache;
 import com.android.volley.toolbox.HurlStack;
 import com.android.volley.toolbox.JsonObjectRequest;
+import com.android.volley.toolbox.Volley;
 import com.github.mikephil.charting.charts.LineChart;
 import com.github.mikephil.charting.components.YAxis;
 import com.github.mikephil.charting.data.Entry;
@@ -39,6 +42,7 @@ import java.util.Calendar;
 import java.util.Collections;
 import java.util.Comparator;
 import java.util.Date;
+import java.util.Iterator;
 import java.util.Locale;
 
 public class MainActivity extends AppCompatActivity {
@@ -51,10 +55,18 @@ public class MainActivity extends AppCompatActivity {
 	private Date fromDate;
 	private Date toDate;
 
+	private String currency1;
+	private ArrayList<String> currencyList1 = new ArrayList<>();
+	private String currency2;
+	private ArrayList<String> currencyList2 = new ArrayList<>();
+
 	private DatePickerDialog fromDatePickerDialog;
 	private DatePickerDialog toDatePickerDialog;
 	private int counter;
 	private LineChart mLineChart;
+	private Spinner fromCurrency;
+	private Spinner toCurrency;
+	private ProgressBar progress;
 
 	@Override
 	protected void onCreate(Bundle savedInstanceState) {
@@ -64,17 +76,19 @@ public class MainActivity extends AppCompatActivity {
 
 		dateFormatter = new SimpleDateFormat("yyyy-MM-dd", Locale.US);
 
-		final EditText fromDateET = (EditText) findViewById(R.id.fromDate);
-		assert fromDateET != null;
-		fromDateET.setOnClickListener(new View.OnClickListener() {
+		progress = (ProgressBar) findViewById(R.id.progressBar);
+
+		final Button fromDateBtn = (Button) findViewById(R.id.fromDate);
+		assert fromDateBtn != null;
+		fromDateBtn.setOnClickListener(new View.OnClickListener() {
 			@Override
 			public void onClick(View v) {
 				fromDatePickerDialog.show();
 			}
 		});
-		final EditText toDateET = (EditText) findViewById(R.id.toDate);
-		assert toDateET != null;
-		toDateET.setOnClickListener(new View.OnClickListener() {
+		final Button toDateBtn = (Button) findViewById(R.id.toDate);
+		assert toDateBtn != null;
+		toDateBtn.setOnClickListener(new View.OnClickListener() {
 			@Override
 			public void onClick(View v) {
 				toDatePickerDialog.show();
@@ -82,12 +96,10 @@ public class MainActivity extends AppCompatActivity {
 		});
 
 
-		final EditText fromCurrency = (EditText) findViewById(R.id.fromCurrency);
+		fromCurrency = (Spinner) findViewById(R.id.fromCurrency);
 		assert fromCurrency != null;
-		fromCurrency.setFilters(new InputFilter[]{new InputFilter.AllCaps()});
-		final EditText toCurrency = (EditText) findViewById(R.id.toCurrency);
+		toCurrency = (Spinner) findViewById(R.id.toCurrency);
 		assert toCurrency != null;
-		toCurrency.setFilters(new InputFilter[]{new InputFilter.AllCaps()});
 
 
 		Calendar newCalendar = Calendar.getInstance();
@@ -96,8 +108,11 @@ public class MainActivity extends AppCompatActivity {
 			public void onDateSet(DatePicker view, int year, int monthOfYear, int dayOfMonth) {
 				Calendar newDate = Calendar.getInstance();
 				newDate.set(year, monthOfYear, dayOfMonth);
-				fromDateStr = dateFormatter.format(newDate.getTime());
-				fromDateET.setText(fromDateStr);
+				fromDate = newDate.getTime();
+				fromDateStr = dateFormatter.format(fromDate);
+				fromDateBtn.setText(fromDateStr);
+				progress.setVisibility(View.VISIBLE);
+				getCurrenciesFrom();
 			}
 
 		},newCalendar.get(Calendar.YEAR), newCalendar.get(Calendar.MONTH), newCalendar.get(Calendar.DAY_OF_MONTH));
@@ -107,12 +122,38 @@ public class MainActivity extends AppCompatActivity {
 			public void onDateSet(DatePicker view, int year, int monthOfYear, int dayOfMonth) {
 				Calendar newDate = Calendar.getInstance();
 				newDate.set(year, monthOfYear, dayOfMonth);
-				toDateStr = dateFormatter.format(newDate.getTime());
-				toDateET.setText(toDateStr);
+				toDate = newDate.getTime();
+				toDateStr = dateFormatter.format(toDate);
+				toDateBtn.setText(toDateStr);
+				progress.setVisibility(View.VISIBLE);
+				getCurrenciesTo();
 			}
 
 		},newCalendar.get(Calendar.YEAR), newCalendar.get(Calendar.MONTH), newCalendar.get(Calendar.DAY_OF_MONTH));
 
+		fromCurrency.setOnItemSelectedListener(new AdapterView.OnItemSelectedListener() {
+			@Override
+			public void onItemSelected(AdapterView<?> parent, View view, int position, long id) {
+				currency1 = (String) parent.getItemAtPosition(position);
+			}
+
+			@Override
+			public void onNothingSelected(AdapterView<?> parent) {
+				currency1 = "";
+			}
+		});
+
+		toCurrency.setOnItemSelectedListener(new AdapterView.OnItemSelectedListener() {
+			@Override
+			public void onItemSelected(AdapterView<?> parent, View view, int position, long id) {
+				currency2 = (String) parent.getItemAtPosition(position);
+			}
+
+			@Override
+			public void onNothingSelected(AdapterView<?> parent) {
+				currency2 = "";
+			}
+		});
 
 		final Button getRatesBtn = (Button) findViewById(R.id.getRates);
 		assert getRatesBtn != null;
@@ -121,15 +162,21 @@ public class MainActivity extends AppCompatActivity {
 			public void onClick(View v) {
 
 				if (!fromDateStr.equals("") && !toDateStr.equals("")) {
-//					getRates("USD", "JPY");
-					if (fromCurrency.getText().toString().equals("") || toCurrency.getText().toString().equals("")) {
-
-						Toast.makeText(MainActivity.this, "Please select currency", Toast.LENGTH_LONG).show();
+					if (fromDate.after(toDate)) {
+						Toast.makeText(MainActivity.this, "'From date' must be earlier than 'To date'", Toast.LENGTH_LONG).show();
 					} else {
-						getRates(fromCurrency.getText().toString(), toCurrency.getText().toString());
+						if (currency1.equals("") || currency2.equals("")) {
+							Toast.makeText(MainActivity.this, "Please select currency", Toast.LENGTH_LONG).show();
+						} else {
+							if (currency1.equals(currency2)) {
+								Toast.makeText(MainActivity.this, "Please select different currencies", Toast.LENGTH_LONG).show();
+							} else {
+								getRates();
+							}
+						}
 					}
 				} else {
-					Toast.makeText(MainActivity.this, "Please select time period first", Toast.LENGTH_LONG).show();
+					Toast.makeText(MainActivity.this, "Please select dates", Toast.LENGTH_LONG).show();
 				}
 
 			}
@@ -137,12 +184,15 @@ public class MainActivity extends AppCompatActivity {
 
 		mLineChart = (LineChart) findViewById(R.id.chart);
 		assert mLineChart != null;
+		mLineChart.getAxisRight().setEnabled(false);
 
 
 		VolleyLog.DEBUG = false;
 	}
 
-	private void getRates(final String currency1, final String currency2) {
+	private void getRates() {
+
+		progress.setVisibility(View.VISIBLE);
 
 		try {
 			fromDate = dateFormatter.parse(fromDateStr);
@@ -202,11 +252,11 @@ public class MainActivity extends AppCompatActivity {
 
 								counter++;
 
+								Log.i(TAG, "rate: " + rate + "\tcount:\t" + (daysBetweenDates - diffInDays) + "\tcounter:\t" + counter + "\tdate:\t" + dateStr + "\ttodate\t" + dateFormatter.format(toDate));
+
 								if (counter == daysBetweenDates) { //set chart data if all responses received
 									setChartData(currency1, currency2, rateValues, xVals);
 								}
-
-								Log.i(TAG, "rate: " + rate + "\tcount:\t" + (daysBetweenDates - diffInDays) + "\tcounter:\t" + counter + "\tdate:\t" + dateStr + "\ttodate\t" + dateFormatter.format(toDate));
 
 							} catch (JSONException e) {
 								e.printStackTrace();
@@ -259,6 +309,8 @@ public class MainActivity extends AppCompatActivity {
 			mLineChart.setDescription("Exchange rates from " + fromDateStr + " to " + toDateStr);
 			mLineChart.invalidate();
 			Log.i(TAG, "set chart data");
+
+			progress.setVisibility(View.INVISIBLE);
 		}
 	}
 
@@ -267,4 +319,99 @@ public class MainActivity extends AppCompatActivity {
 		return (int)( (toDate.getTime() - fromDate.getTime())
 				/ (86400000) );
 	}
+
+	private void getCurrenciesFrom() {
+
+		String uri = String.format("http://api.fixer.io/%1$s",	fromDateStr);
+
+		JsonObjectRequest jsonObjectRequest = new JsonObjectRequest(
+				Request.Method.GET,
+				uri,
+				null,
+				new Response.Listener<JSONObject>() {
+					@Override
+					public void onResponse(JSONObject response) {
+						try {
+							JSONObject rates = response.getJSONObject("rates");
+							Iterator<String> keys = rates.keys();
+							currencyList1.clear();
+							while (keys.hasNext()) {
+								currencyList1.add(keys.next());
+							}
+
+							if (!currencyList2.isEmpty()) {
+								ArrayAdapter<String> adapter = new ArrayAdapter<>(MainActivity.this,
+										android.R.layout.simple_spinner_item);
+								currencyList1.retainAll(currencyList2);
+								adapter.addAll(currencyList1);
+
+								fromCurrency.setAdapter(adapter);
+								toCurrency.setAdapter(adapter);
+							}
+							progress.setVisibility(View.INVISIBLE);
+
+						} catch (JSONException e) {
+							e.printStackTrace();
+							Log.i(TAG, "error json parse");
+						}
+					}
+				},
+				new Response.ErrorListener() {
+					@Override
+					public void onErrorResponse(VolleyError error) {
+						Log.i(TAG, "error response");
+						getCurrenciesFrom();//repeat
+					}
+				}
+		);
+		Volley.newRequestQueue(this).add(jsonObjectRequest);
+	}
+
+	private void getCurrenciesTo() {
+
+		String uri = String.format("http://api.fixer.io/%1$s",	toDateStr);
+
+		JsonObjectRequest jsonObjectRequest = new JsonObjectRequest(
+				Request.Method.GET,
+				uri,
+				null,
+				new Response.Listener<JSONObject>() {
+					@Override
+					public void onResponse(JSONObject response) {
+						try {
+							JSONObject rates = response.getJSONObject("rates");
+							Iterator<String> keys = rates.keys();
+							currencyList2.clear();
+							while (keys.hasNext()) {
+								currencyList2.add(keys.next());
+							}
+
+							if (!currencyList1.isEmpty()) {
+								ArrayAdapter<String> adapter = new ArrayAdapter<>(MainActivity.this,
+										android.R.layout.simple_spinner_item);
+								currencyList2.retainAll(currencyList1);
+								adapter.addAll(currencyList2);
+
+								fromCurrency.setAdapter(adapter);
+								toCurrency.setAdapter(adapter);
+							}
+							progress.setVisibility(View.INVISIBLE);
+
+						} catch (JSONException e) {
+							e.printStackTrace();
+							Log.i(TAG, "error json parse");
+						}
+					}
+				},
+				new Response.ErrorListener() {
+					@Override
+					public void onErrorResponse(VolleyError error) {
+						Log.i(TAG, "error response");
+						getCurrenciesTo();//repeat
+					}
+				}
+		);
+		Volley.newRequestQueue(this).add(jsonObjectRequest);
+	}
+
 }
