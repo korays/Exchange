@@ -97,9 +97,7 @@ public class MainActivity extends AppCompatActivity {
 
 
 		fromCurrency = (Spinner) findViewById(R.id.fromCurrency);
-		assert fromCurrency != null;
 		toCurrency = (Spinner) findViewById(R.id.toCurrency);
-		assert toCurrency != null;
 
 
 		Calendar newCalendar = Calendar.getInstance();
@@ -412,6 +410,10 @@ public class MainActivity extends AppCompatActivity {
 				}
 		);
 		Volley.newRequestQueue(this).add(jsonObjectRequest);
+	}
+
+	public boolean checker(String s) {
+		return s.equals("test");
 	}
 
 }
